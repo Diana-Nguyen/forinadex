@@ -150,7 +150,7 @@
     .light-small.yellow { background: #FFDD44; }
     .light-small.green { background: #44CC44; }
 
-    .disclaimer {
+    .site-footer {
       max-width: 900px;
       width: 100%;
       margin-top: 10px;
@@ -160,6 +160,18 @@
       line-height: 1.5;
       color: var(--disclaimer-color);
       flex-shrink: 0;
+    }
+
+    .site-footer a {
+      color: inherit;
+    }
+
+    .site-footer a:hover {
+      text-decoration: underline;
+    }
+
+    .site-footer p + p {
+      margin-top: 8px;
     }
 
     .screen {
@@ -359,6 +371,14 @@
       max-width: 400px;
       margin: 0 auto;
       padding-top: 20px;
+    }
+
+    .login-intro {
+      text-align: center;
+      font-size: 18px;
+      line-height: 1.4;
+      color: var(--screen-green-muted);
+      margin: -8px 0 40px;
     }
 
     /* Header bar */
@@ -805,7 +825,7 @@
         padding: 5px 8px;
       }
 
-      body:has(.sidebar:not(.hidden)) .disclaimer {
+      body:has(.sidebar:not(.hidden)) .site-footer {
         margin-bottom: calc(var(--mobile-bar-height) + 16px + env(safe-area-inset-bottom));
       }
 
@@ -850,10 +870,13 @@
     </div>
   </div>
 
-  <p class="disclaimer">
-    Pokédex-inspired fan project. Pokémon, Pokédex, and related marks are trademarks of
-    Nintendo, Creatures Inc., and GAME FREAK inc. Not affiliated with or endorsed by The Pokémon Company.
-  </p>
+  <div class="site-footer">
+    <p class="site-credit">Made by <a href="https://github.com/Diana-Nguyen" target="_blank" rel="noopener">Diana Nguyen</a></p>
+    <p class="disclaimer">
+      Pokédex-inspired fan project. Pokémon, Pokédex, and related marks are trademarks of
+      Nintendo, Creatures Inc., and GAME FREAK inc. Not affiliated with or endorsed by The Pokémon Company.
+    </p>
+  </div>
 
   <script type="module">
     let githubToken = null;
@@ -1760,6 +1783,7 @@
       screenRoot.innerHTML = `
         <div class="login-panel">
           <h1>ForinaDex</h1>
+          <p class="login-intro">A tracker for your Pokémon TCG cards. Browse sets, mark owned and wishlist cards, and save your collection to GitHub Gist.</p>
           <form id="login-form">
           <div class="form-group">
             <label class="form-label" for="gh-token">GITHUB PERSONAL ACCESS TOKEN</label>
