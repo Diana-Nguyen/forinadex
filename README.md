@@ -4,6 +4,8 @@ A Pokémon TCG card collection tracker. Named after Forina — the hidden valley
 
 Track cards you own and cards on your wish list, then sync everything to a public GitHub Gist. A separate React widget lets any portfolio display your collection read-only.
 
+Live app: [Diana-Nguyen.github.io/forinadex/](https://Diana-Nguyen.github.io/forinadex/)
+
 ## What's in this repo
 
 | File | Purpose |
