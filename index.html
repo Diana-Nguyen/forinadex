@@ -1,0 +1,2100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForinaDex — Pokémon TCG Collection Tracker</title>
+  <meta name="description" content="Track your Pokémon TCG cards with ForinaDex. Browse every set, mark cards as owned or wishlisted, and auto-save your collection to a public GitHub Gist.">
+  <link rel="canonical" href="https://Diana-Nguyen.github.io/forinadex/">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' x='50%25' text-anchor='middle' font-size='85'%3E%E2%AD%90%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://api.pokemontcg.io">
+  <link rel="preconnect" href="https://api.github.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --pokedex-red: #CC0000;
+      --pokedex-dark-red: #880000;
+      --panel-cream: #F5F5DC;
+      --screen-green: #9BBB0A;
+      --screen-green-muted: #B0C814;
+      --screen-green-faint: #A4B80E;
+      --placeholder-color: rgba(155, 187, 10, 0.32);
+      --disclaimer-color: #B8B8B8;
+      --screen-dark: #1A1A1A;
+      --button-yellow: #FFD700;
+      --border-dark: #222222;
+      --grid-set-min: 140px;
+      --grid-card-min: 110px;
+      --grid-gap: 12px;
+      --card-img-max: 120px;
+      --card-placeholder-h: 120px;
+      --set-logo-max-w: 80px;
+      --set-logo-max-h: 40px;
+    }
+
+    :root.grid-large {
+      --grid-set-min: 200px;
+      --grid-card-min: 180px;
+      --grid-gap: 16px;
+      --card-img-max: 200px;
+      --card-placeholder-h: 200px;
+      --set-logo-max-w: 120px;
+      --set-logo-max-h: 60px;
+    }
+
+    :root.contrast-high {
+      --screen-green: #F0FF50;
+      --screen-green-muted: #E8FF40;
+      --screen-green-faint: #E0F838;
+      --placeholder-color: rgba(240, 255, 80, 0.42);
+      --disclaimer-color: #FFFFFF;
+    }
+
+    @media (prefers-contrast: more) {
+      :root:not(.contrast-normal) {
+        --screen-green: #F0FF50;
+        --screen-green-muted: #E8FF40;
+        --screen-green-faint: #E0F838;
+        --placeholder-color: rgba(240, 255, 80, 0.42);
+        --disclaimer-color: #FFFFFF;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      height: 100%;
+      background: #333;
+    }
+
+    body {
+      height: 100vh;
+      max-height: 100vh;
+      overflow: hidden;
+      background: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px 16px 16px;
+      font-family: 'VT323', monospace;
+      font-size: 20px;
+      color: var(--border-dark);
+    }
+
+    @media (min-width: 769px) {
+      body {
+        padding-top: max(24px, 6vh);
+      }
+    }
+
+    .pokedex {
+      width: 100%;
+      max-width: 900px;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--pokedex-red);
+      border: 4px solid var(--pokedex-dark-red);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 8px 8px 0 var(--border-dark);
+    }
+
+    .pokedex-top {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 20px 0;
+      position: relative;
+    }
+
+    .lights {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+
+    .light-large-wrap {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid var(--border-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .light-large {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #77AAFF, #2266CC);
+      box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.2);
+    }
+
+    .light-small {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--border-dark);
+    }
+
+    .light-small.red { background: #FF4444; }
+    .light-small.yellow { background: #FFDD44; }
+    .light-small.green { background: #44CC44; }
+
+    .disclaimer {
+      max-width: 900px;
+      width: 100%;
+      margin-top: 10px;
+      padding: 0 20px 16px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--disclaimer-color);
+      flex-shrink: 0;
+    }
+
+    .screen {
+      flex: 1;
+      min-height: 420px;
+      background: var(--screen-dark);
+      border: 4px solid var(--border-dark);
+      border-radius: 8px;
+      overflow-y: auto;
+      position: relative;
+      padding: 16px;
+      padding-bottom: 28px;
+      color: var(--screen-green);
+    }
+
+    .screen-content {
+      position: relative;
+      z-index: 1;
+      min-height: 100%;
+    }
+
+    .screen-content::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.05) 2px,
+        rgba(0, 0, 0, 0.05) 4px
+      );
+      pointer-events: none;
+    }
+
+    .screen-content::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(155, 187, 10, 0.06);
+      pointer-events: none;
+    }
+
+    .hinge {
+      height: 12px;
+      flex-shrink: 0;
+      background: var(--pokedex-dark-red);
+      border-top: 3px solid var(--border-dark);
+      border-bottom: 3px solid var(--border-dark);
+      margin-top: 16px;
+    }
+
+    .pokedex-bottom {
+      flex-shrink: 0;
+      background: var(--panel-cream);
+      padding: 16px 20px 20px;
+    }
+
+    .pokedex-bottom:has(.sidebar.hidden) {
+      display: none;
+    }
+
+    .pokedex:has(.sidebar.hidden) .pokedex-top {
+      padding-bottom: 20px;
+    }
+
+    .pokedex:has(.sidebar.hidden) .hinge {
+      display: none;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-counts {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      line-height: 1.8;
+    }
+
+    .sidebar-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .sidebar .btn-small.gist-msg {
+      font-size: 7px;
+      cursor: default;
+    }
+
+    h1, h2, h3, .pixel-label {
+      font-family: 'Press Start 2P', monospace;
+    }
+
+    h1 { font-size: 18px; text-align: center; margin-bottom: 20px; color: var(--screen-green); }
+    h2 { font-size: 12px; margin-bottom: 12px; }
+    h3 { font-size: 10px; }
+
+    .btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      padding: 10px 14px;
+      background: var(--button-yellow);
+      border: 3px solid var(--border-dark);
+      cursor: pointer;
+      color: var(--border-dark);
+      box-shadow: 4px 4px 0 var(--border-dark);
+      transition: none;
+    }
+
+    .btn:active {
+      transform: translateY(2px);
+      box-shadow: 2px 2px 0 var(--border-dark);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn.active {
+      background: var(--screen-green);
+      color: var(--screen-dark);
+    }
+
+    .btn-small {
+      font-size: 8px;
+      padding: 6px 10px;
+    }
+
+    .btn-own.active { background: #44AA44; color: #fff; }
+    .btn-wish.active { background: #AA44AA; color: #fff; }
+
+    .btn-danger { background: #FF6666; }
+
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-family: 'VT323', monospace;
+      font-size: 22px;
+      background: var(--screen-dark);
+      color: var(--screen-green);
+      border: 3px solid var(--border-dark);
+      margin-bottom: 8px;
+    }
+
+    input::placeholder { color: var(--placeholder-color); }
+
+    .form-group { margin-bottom: 16px; }
+
+    .form-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      display: block;
+      margin-bottom: 6px;
+      color: var(--screen-green);
+    }
+
+    .helper-text {
+      font-size: 16px;
+      color: var(--screen-green-muted);
+      margin-bottom: 8px;
+    }
+
+    .form-link {
+      font-size: 16px;
+      color: var(--button-yellow);
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    .form-link:hover { text-decoration: underline; }
+
+    .security-note {
+      text-align: center;
+      font-size: 20px;
+      color: var(--screen-green-faint);
+      margin-top: 16px;
+      padding-bottom: 4px;
+      max-width: 100%;
+      line-height: 1.35;
+    }
+
+    .error-msg {
+      color: #FF6666;
+      font-size: 18px;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .login-panel {
+      max-width: 400px;
+      margin: 0 auto;
+      padding-top: 20px;
+    }
+
+    /* Header bar */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--screen-green);
+    }
+
+    .username {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--screen-green);
+    }
+
+    .save-status {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+    }
+
+    button.save-status {
+      background: none;
+      border: none;
+      padding: 0;
+      color: inherit;
+      font: inherit;
+    }
+
+    button.save-status:not(.error) {
+      cursor: default;
+    }
+
+    .save-status.saving { color: var(--button-yellow); }
+    .save-status.saved { color: #44FF44; }
+    .save-status.error { color: #FF6666; cursor: pointer; }
+
+    .sync-banner {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--button-yellow);
+      background: rgba(0, 0, 0, 0.35);
+      border: 2px solid var(--button-yellow);
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .sync-banner.hidden { display: none; }
+
+    .search-bar {
+      margin-bottom: 16px;
+    }
+
+    .search-bar input {
+      margin-bottom: 0;
+    }
+
+    /* Grids */
+    .grid-sets {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--grid-set-min), 1fr));
+      gap: var(--grid-gap);
+    }
+
+    .grid-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--grid-card-min), 1fr));
+      gap: var(--grid-gap);
+    }
+
+    .set-card {
+      background: rgba(155, 187, 10, 0.08);
+      border: 3px solid var(--border-dark);
+      padding: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: none;
+    }
+
+    .set-card:hover {
+      border-color: var(--screen-green);
+    }
+
+    .set-card img {
+      max-width: var(--set-logo-max-w);
+      max-height: var(--set-logo-max-h);
+      object-fit: contain;
+      margin-bottom: 6px;
+    }
+
+    .set-card .card-placeholder {
+      height: var(--set-logo-max-h);
+    }
+
+    .set-card .set-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      line-height: 1.6;
+      color: var(--screen-green);
+      margin-bottom: 4px;
+    }
+
+    .set-card .set-meta {
+      font-size: 16px;
+      color: var(--screen-green-muted);
+    }
+
+    .card-item {
+      background: rgba(155, 187, 10, 0.08);
+      border: 3px solid var(--border-dark);
+      padding: 8px;
+      text-align: center;
+      transition: none;
+    }
+
+    .card-item.owned { border-color: #44AA44; }
+    .card-item.wishlisted { border-color: #AA44AA; }
+    .card-item.filtered-out { display: none; }
+
+    .card-item img {
+      width: 100%;
+      max-height: var(--card-img-max);
+      object-fit: contain;
+      margin-bottom: 4px;
+    }
+
+    .card-placeholder {
+      width: 100%;
+      height: var(--card-placeholder-h);
+      background: #444;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed #666;
+    }
+
+    .card-placeholder::after {
+      content: '?';
+      font-size: 48px;
+      color: #666;
+    }
+
+    .card-name {
+      font-size: 16px;
+      color: var(--screen-green);
+      margin-bottom: 2px;
+      line-height: 1.2;
+    }
+
+    .card-number {
+      font-size: 14px;
+      color: var(--screen-green-faint);
+      margin-bottom: 6px;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+    }
+
+    .cards-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .cards-header img {
+      max-height: 36px;
+      max-width: 80px;
+      object-fit: contain;
+    }
+
+    .cards-header-info h2 {
+      color: var(--screen-green);
+      margin-bottom: 4px;
+    }
+
+    .cards-header-info p {
+      font-size: 16px;
+      color: var(--screen-green-muted);
+    }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .page-indicator {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--screen-green);
+    }
+
+    .banner-error {
+      background: #FF6666;
+      color: #fff;
+      padding: 12px;
+      text-align: center;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      margin-bottom: 12px;
+      border: 3px solid var(--border-dark);
+    }
+
+    .banner-error button {
+      margin-top: 8px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      color: var(--screen-green);
+    }
+
+    .hidden { display: none !important; }
+
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .dialog {
+      background: var(--panel-cream);
+      border: 4px solid var(--border-dark);
+      padding: 24px;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .dialog p {
+      margin-bottom: 16px;
+      font-size: 20px;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .settings-wrap {
+      position: relative;
+    }
+
+    .btn-settings {
+      font-size: 8px;
+    }
+
+    .btn-settings:focus-visible {
+      outline: 3px solid var(--screen-green);
+      outline-offset: 2px;
+    }
+
+    .settings-popover {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--panel-cream);
+      border: 3px solid var(--border-dark);
+      padding: 12px;
+      min-width: 160px;
+      z-index: 20;
+      box-shadow: 4px 4px 0 var(--border-dark);
+    }
+
+    .settings-popover.hidden { display: none; }
+
+    .settings-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      color: var(--border-dark);
+      margin-bottom: 8px;
+    }
+
+    .settings-row + .settings-row {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 2px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .settings-options {
+      display: flex;
+      gap: 6px;
+    }
+
+    .settings-options .btn.active {
+      background: var(--screen-green);
+      color: var(--screen-dark);
+    }
+
+    .collection-view { margin-top: 4px; }
+
+    .collection-set-name {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--screen-green);
+      margin: 16px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid rgba(155, 187, 10, 0.3);
+    }
+
+    .collection-group:first-child .collection-set-name {
+      margin-top: 0;
+    }
+
+    .collection-header h2 {
+      color: var(--screen-green);
+      margin-bottom: 4px;
+    }
+
+    .collection-header p {
+      font-size: 16px;
+      color: var(--screen-green-muted);
+      margin-bottom: 12px;
+    }
+
+    .collection-empty {
+      text-align: center;
+      padding: 40px 16px;
+      color: var(--screen-green-muted);
+    }
+
+    @media (max-width: 768px) {
+      :root {
+        --mobile-bar-height: 110px;
+      }
+
+      body {
+        padding: 0;
+        height: 100vh;
+        max-height: 100dvh;
+      }
+
+      .pokedex {
+        max-width: 100%;
+        flex: 1;
+        min-height: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+      }
+
+      .pokedex-top {
+        flex: 1;
+        min-height: 0;
+      }
+
+      .lights { display: none; }
+
+      .screen {
+        flex: 1;
+        min-height: 0;
+      }
+
+      body:has(.sidebar:not(.hidden)) .screen {
+        padding-bottom: calc(var(--mobile-bar-height) + 8px);
+      }
+
+      .pokedex-bottom {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+        border-top: 3px solid var(--border-dark);
+        padding: 8px 10px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      }
+
+      .pokedex-bottom:has(.sidebar.hidden) {
+        display: none;
+      }
+
+      .pokedex:has(.sidebar.hidden) .hinge {
+        display: none;
+      }
+
+      .sidebar {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        grid-template-rows: auto auto;
+        gap: 6px 8px;
+        align-items: center;
+      }
+
+      .sidebar-counts {
+        grid-column: 1;
+        grid-row: 1;
+        font-size: 8px;
+      }
+
+      .sidebar-filters {
+        grid-column: 2 / -1;
+        grid-row: 1;
+        flex-wrap: nowrap;
+      }
+
+      #copy-gist-btn {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        width: 100%;
+        text-align: center;
+      }
+
+      .sidebar .btn-small {
+        font-size: 7px;
+        padding: 5px 8px;
+      }
+
+      body:has(.sidebar:not(.hidden)) .disclaimer {
+        margin-bottom: calc(var(--mobile-bar-height) + 16px + env(safe-area-inset-bottom));
+      }
+
+      :root.grid-large {
+        --grid-set-min: 170px;
+        --grid-card-min: 155px;
+        --card-img-max: 175px;
+        --card-placeholder-h: 175px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="pokedex">
+    <div class="pokedex-top">
+      <div class="lights">
+        <div class="light-large-wrap">
+          <div class="light-large"></div>
+        </div>
+        <div class="light-small red"></div>
+        <div class="light-small yellow"></div>
+        <div class="light-small green"></div>
+      </div>
+      <div class="screen">
+        <div class="screen-content" id="screen-root"></div>
+      </div>
+    </div>
+    <div class="hinge"></div>
+    <div class="pokedex-bottom">
+      <div class="sidebar hidden" id="sidebar">
+        <div class="sidebar-counts">
+          <div id="owned-count">OWNED: 0</div>
+          <div id="wishlist-count">WISHLIST: 0</div>
+        </div>
+        <div class="sidebar-filters">
+          <button class="btn btn-small active" data-filter="all">ALL</button>
+          <button class="btn btn-small" data-filter="owned">OWNED</button>
+          <button class="btn btn-small" data-filter="wishlist">WISHLIST</button>
+        </div>
+        <button class="btn btn-small" id="copy-gist-btn">COPY GIST ID</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="disclaimer">
+    Pokédex-inspired fan project. Pokémon, Pokédex, and related marks are trademarks of
+    Nintendo, Creatures Inc., and GAME FREAK inc. Not affiliated with or endorsed by The Pokémon Company.
+  </p>
+
+  <script type="module">
+    let githubToken = null;
+    let tcgApiKey = null;
+    let collection = { owned: [], wishlist: [] };
+
+    const SCREEN = Object.freeze({ LOGIN: 1, SETS: 2, CARDS: 3, COLLECTION: 4 });
+    const CACHE_TTL = 24 * 60 * 60 * 1000;
+    const GIST_FILENAME = 'forina-collection.json';
+    const COLLECTION_VERSION = 1;
+    const SAVE_DEBOUNCE_MS = 2000;
+    const CARD_PAGE_SIZE = 40;
+
+    let currentScreen = SCREEN.LOGIN;
+    let sets = [];
+    let currentSet = null;
+    let currentCards = [];
+    let currentPage = 1;
+    let totalPages = 1;
+    let collectionView = 'all';
+    let saveStatus = 'idle';
+    let saveErrorDetail = '';
+    let saveDebounceTimer = null;
+    let rateLimitUntil = 0;
+    let loginError = '';
+    let pendingGistId = null;
+    let setSearchQuery = '';
+    let cardSearchQuery = '';
+    let cardSearchDebounce = null;
+    let loginFormDraft = { gh: '', tcg: '', gist: '' };
+    let isLoggingIn = false;
+    let ownedIds = new Set();
+    let wishlistIds = new Set();
+    let ownedCountBySet = new Map();
+    let collectionLastUpdated = null;
+    let settingsCloseHandler = null;
+    let tcgFetchController = null;
+    let syncBannerTimer = null;
+
+    const $ = (sel) => document.querySelector(sel);
+    const screenRoot = $('#screen-root');
+    const sidebar = $('#sidebar');
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function isValidCard(card) {
+      return card
+        && typeof card.cardId === 'string'
+        && typeof card.cardName === 'string'
+        && typeof card.setId === 'string'
+        && typeof card.setName === 'string';
+    }
+
+    function sanitizeCollection(data) {
+      return {
+        owned: Array.isArray(data.owned) ? data.owned.filter(isValidCard) : [],
+        wishlist: Array.isArray(data.wishlist) ? data.wishlist.filter(isValidCard) : [],
+      };
+    }
+
+    function cardImgHtml(src, alt) {
+      if (!src) return '<div class="card-placeholder"></div>';
+      return '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '" loading="lazy" data-img-fallback>';
+    }
+
+    function bindImgFallbacks(root = screenRoot) {
+      root?.querySelectorAll('img[data-img-fallback]').forEach((img) => {
+        img.addEventListener('error', () => {
+          const ph = document.createElement('div');
+          ph.className = 'card-placeholder';
+          img.replaceWith(ph);
+        }, { once: true });
+      });
+    }
+
+    function renderSaveStatusHtml() {
+      const labels = {
+        saving: 'SAVING…',
+        saved: 'SAVED ✓',
+        error: saveErrorDetail || 'ERROR ✗ — click to retry',
+      };
+      if (saveStatus === 'idle') {
+        return '<span class="save-status" id="save-status-el" aria-hidden="true"></span>';
+      }
+      const label = labels[saveStatus] || '';
+      if (saveStatus === 'error') {
+        return `<button type="button" class="save-status error" id="save-status-el">${label}</button>`;
+      }
+      return `<span class="save-status ${saveStatus}" id="save-status-el" aria-live="polite">${label}</span>`;
+    }
+
+    function renderAppHeader({ variant = 'sets', extra = '' } = {}) {
+      if (variant === 'sets') {
+        const username = lsGet('forina_username') || '';
+        const avatar = lsGet('forina_avatar_url') || '';
+        return `
+          <div class="header-bar">
+            <div class="user-info">
+              ${avatar ? `<img class="avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(username)}">` : ''}
+              <span class="username">${escapeHtml(username)}</span>
+            </div>
+            ${extra}
+            <div class="header-actions">
+              ${renderSettingsButton()}
+              <button class="btn btn-small btn-danger" id="logout-btn">LOG OUT</button>
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div class="header-bar">
+          <button class="btn btn-small" id="back-btn">← BACK</button>
+          ${renderSaveStatusHtml()}
+          <div class="header-actions">
+            ${renderSettingsButton()}
+            <button class="btn btn-small btn-danger" id="logout-btn">LOG OUT</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindSaveStatusEvents() {
+      $('#save-status-el')?.addEventListener('click', () => {
+        if (saveStatus === 'error') saveToGist();
+      });
+    }
+
+    function showSyncBanner(message) {
+      let banner = $('#sync-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'sync-banner';
+        banner.className = 'sync-banner';
+        banner.setAttribute('role', 'status');
+        screenRoot.prepend(banner);
+      }
+      banner.textContent = message;
+      banner.classList.remove('hidden');
+      clearTimeout(syncBannerTimer);
+      syncBannerTimer = setTimeout(() => banner.classList.add('hidden'), 4000);
+    }
+
+    function refreshCurrentView() {
+      if (currentScreen === SCREEN.SETS) renderSetsGrid();
+      else if (currentScreen === SCREEN.CARDS) renderCardsGrid();
+      else if (currentScreen === SCREEN.COLLECTION) renderCollectionScreen(collectionView);
+    }
+
+    function lsGet(key) {
+      return localStorage.getItem(key);
+    }
+
+    function lsSet(key, val) {
+      try {
+        localStorage.setItem(key, val);
+      } catch {
+        /* quota exceeded — cache write skipped */
+      }
+    }
+
+    function lsClear() {
+      ['forina_gist_id', 'forina_username', 'forina_avatar_url', 'forina_sets_cache', 'forina_sets_cache_ts']
+        .forEach(k => localStorage.removeItem(k));
+    }
+
+    function getContrastMode() {
+      const saved = lsGet('forina_contrast');
+      if (saved === 'high' || saved === 'normal') return saved;
+      if (window.matchMedia('(prefers-contrast: more)').matches) return 'high';
+      return 'normal';
+    }
+
+    function applyContrast(mode) {
+      document.documentElement.classList.remove('contrast-high', 'contrast-normal');
+      if (mode === 'high') {
+        document.documentElement.classList.add('contrast-high');
+      } else if (mode === 'normal') {
+        document.documentElement.classList.add('contrast-normal');
+      }
+    }
+
+    function setContrastMode(mode) {
+      lsSet('forina_contrast', mode);
+      applyContrast(mode);
+      document.querySelectorAll('[data-contrast]').forEach(b => {
+        b.classList.toggle('active', b.dataset.contrast === mode);
+      });
+    }
+
+    function initContrast() {
+      applyContrast(getContrastMode());
+    }
+
+    function getGridSize() {
+      const saved = lsGet('forina_grid_size');
+      return saved === 'large' ? 'large' : 'normal';
+    }
+
+    function applyGridSize(size) {
+      document.documentElement.classList.toggle('grid-large', size === 'large');
+    }
+
+    function setGridSize(size) {
+      lsSet('forina_grid_size', size);
+      applyGridSize(size);
+      document.querySelectorAll('[data-grid-size]').forEach(b => {
+        b.classList.toggle('active', b.dataset.gridSize === size);
+      });
+    }
+
+    function initGridSize() {
+      applyGridSize(getGridSize());
+    }
+
+    function renderSettingsButton() {
+      const mode = getContrastMode();
+      const gridSize = getGridSize();
+      return `
+        <div class="settings-wrap">
+          <button class="btn btn-small btn-settings" id="settings-btn" aria-label="Display settings" aria-expanded="false">SETTINGS</button>
+          <div class="settings-popover hidden" id="settings-popover" role="dialog" aria-label="Display settings">
+            <div class="settings-row">
+              <p class="settings-label">CONTRAST</p>
+              <div class="settings-options">
+                <button class="btn btn-small ${mode === 'normal' ? 'active' : ''}" data-contrast="normal">NORMAL</button>
+                <button class="btn btn-small ${mode === 'high' ? 'active' : ''}" data-contrast="high">HIGH</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <p class="settings-label">CARD SIZE</p>
+              <div class="settings-options">
+                <button class="btn btn-small ${gridSize === 'normal' ? 'active' : ''}" data-grid-size="normal">NORMAL</button>
+                <button class="btn btn-small ${gridSize === 'large' ? 'active' : ''}" data-grid-size="large">LARGE</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindSettingsEvents() {
+      const btn = $('#settings-btn');
+      const popover = $('#settings-popover');
+      if (!btn || !popover) return;
+
+      if (settingsCloseHandler) {
+        document.removeEventListener('click', settingsCloseHandler);
+        document.removeEventListener('keydown', settingsCloseHandler);
+        settingsCloseHandler = null;
+      }
+
+      const close = () => {
+        popover.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+        if (settingsCloseHandler) {
+          document.removeEventListener('click', settingsCloseHandler);
+          document.removeEventListener('keydown', settingsCloseHandler);
+          settingsCloseHandler = null;
+        }
+      };
+
+      settingsCloseHandler = (e) => {
+        if (e.type === 'keydown') {
+          if (e.key === 'Escape') close();
+          return;
+        }
+        if (!popover.contains(e.target) && e.target !== btn) close();
+      };
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = popover.classList.contains('hidden');
+        if (isHidden) {
+          popover.classList.remove('hidden');
+          btn.setAttribute('aria-expanded', 'true');
+          requestAnimationFrame(() => {
+            document.addEventListener('click', settingsCloseHandler);
+            document.addEventListener('keydown', settingsCloseHandler);
+          });
+        } else {
+          close();
+        }
+      });
+
+      popover.addEventListener('click', (e) => e.stopPropagation());
+
+      popover.querySelectorAll('[data-contrast]').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setContrastMode(opt.dataset.contrast);
+        });
+      });
+
+      popover.querySelectorAll('[data-grid-size]').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setGridSize(opt.dataset.gridSize);
+        });
+      });
+    }
+
+    function getGistId() {
+      return pendingGistId || lsGet('forina_gist_id') || '';
+    }
+
+    async function githubFetch(path, options = {}) {
+      const res = await fetch(`https://api.github.com${path}`, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: 'application/vnd.github+json',
+          ...options.headers,
+        },
+      });
+      if (res.status === 401) {
+        handleInvalidToken();
+        throw new Error('Invalid GitHub token');
+      }
+      return res;
+    }
+
+    async function tcgFetch(path, { signal } = {}) {
+      if (Date.now() < rateLimitUntil) {
+        throw new Error('rate_limit');
+      }
+      if (!navigator.onLine) {
+        throw new Error('offline');
+      }
+      const res = await fetch(`https://api.pokemontcg.io/v2${path}`, {
+        headers: { 'X-Api-Key': tcgApiKey },
+        signal,
+      });
+      if (res.status === 429) {
+        rateLimitUntil = Date.now() + 60000;
+        throw new Error('rate_limit');
+      }
+      if (!res.ok) {
+        throw new Error(`TCG API error: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    function handleInvalidToken() {
+      githubToken = null;
+      tcgApiKey = null;
+      collection = { owned: [], wishlist: [] };
+      collectionLastUpdated = null;
+      rebuildCollectionIndexes();
+      if (saveDebounceTimer) {
+        clearTimeout(saveDebounceTimer);
+        saveDebounceTimer = null;
+      }
+      loginError = 'GitHub token is invalid or expired. Please log in again.';
+      currentScreen = SCREEN.LOGIN;
+      sidebar.classList.add('hidden');
+      render();
+    }
+
+    async function fetchSets() {
+      const cached = lsGet('forina_sets_cache');
+      const ts = Number(lsGet('forina_sets_cache_ts'));
+      if (cached && ts && Date.now() - ts < CACHE_TTL) {
+        try {
+          return JSON.parse(cached);
+        } catch {
+          localStorage.removeItem('forina_sets_cache');
+          localStorage.removeItem('forina_sets_cache_ts');
+        }
+      }
+      const data = await tcgFetch('/sets?pageSize=250');
+      let allSets = data.data;
+      let page = 2;
+      while (data.totalCount && allSets.length < data.totalCount) {
+        const next = await tcgFetch(`/sets?pageSize=250&page=${page}`);
+        allSets = allSets.concat(next.data);
+        page++;
+        if (next.data.length === 0) break;
+      }
+      allSets.sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate));
+      lsSet('forina_sets_cache', JSON.stringify(allSets));
+      lsSet('forina_sets_cache_ts', String(Date.now()));
+      return allSets;
+    }
+
+    function buildGistPayload() {
+      return {
+        version: COLLECTION_VERSION,
+        lastUpdated: new Date().toISOString(),
+        owned: collection.owned,
+        wishlist: collection.wishlist,
+      };
+    }
+
+    function saveErrorMessage(status) {
+      if (status === 403) return 'GitHub rate limit — wait and retry';
+      if (status === 404) return 'Gist not found';
+      if (status >= 500) return 'GitHub unavailable — retry later';
+      return 'Save failed — click to retry';
+    }
+
+    async function saveToGist(isRetry = false) {
+      if (!githubToken) return;
+      saveStatus = 'saving';
+      saveErrorDetail = '';
+      updateSaveStatusUI();
+
+      const content = JSON.stringify(buildGistPayload(), null, 2);
+      const gistId = getGistId();
+
+      try {
+        let res;
+        if (gistId) {
+          res = await githubFetch(`/gists/${gistId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              files: { [GIST_FILENAME]: { content } },
+            }),
+          });
+        } else {
+          res = await githubFetch('/gists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: 'ForinaDex Pokémon TCG Collection',
+              public: true,
+              files: { [GIST_FILENAME]: { content } },
+            }),
+          });
+        }
+
+        if (!res.ok) {
+          if (res.status === 404 && gistId && !isRetry) {
+            pendingGistId = null;
+            localStorage.removeItem('forina_gist_id');
+            return saveToGist(true);
+          }
+          saveStatus = 'error';
+          saveErrorDetail = saveErrorMessage(res.status);
+          updateSaveStatusUI();
+          return;
+        }
+        const gist = await res.json();
+        lsSet('forina_gist_id', gist.id);
+        pendingGistId = gist.id;
+        saveStatus = 'saved';
+        saveErrorDetail = '';
+        collectionLastUpdated = buildGistPayload().lastUpdated;
+      } catch (err) {
+        if (err.message === 'Invalid GitHub token') return;
+        saveStatus = 'error';
+        saveErrorDetail = err.message?.includes('Failed to fetch')
+          ? 'Offline — click to retry'
+          : 'Save failed — click to retry';
+      }
+      updateSaveStatusUI();
+    }
+
+    function debouncedSave() {
+      if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+      saveDebounceTimer = setTimeout(() => {
+        saveDebounceTimer = null;
+        saveToGist();
+      }, SAVE_DEBOUNCE_MS);
+    }
+
+    async function loadGist(gistId) {
+      const res = await githubFetch(`/gists/${gistId}`);
+      if (res.status === 404) {
+        return { notFound: true };
+      }
+      if (!res.ok) throw new Error(`Gist load failed: ${res.status}`);
+      const gist = await res.json();
+      const file = gist.files[GIST_FILENAME];
+      if (!file?.content) return { notFound: true };
+      if (file.truncated) return { invalid: true };
+      try {
+        const data = JSON.parse(file.content);
+        if (!Array.isArray(data.owned) || !Array.isArray(data.wishlist)) {
+          return { invalid: true };
+        }
+        if (data.version && data.version > COLLECTION_VERSION) {
+          console.warn('ForinaDex: collection version newer than supported');
+        }
+        collection = sanitizeCollection(data);
+        collectionLastUpdated = data.lastUpdated || null;
+        rebuildCollectionIndexes();
+      } catch {
+        return { invalid: true };
+      }
+      return { ok: true };
+    }
+
+    function rebuildCollectionIndexes() {
+      ownedIds = new Set();
+      wishlistIds = new Set();
+      ownedCountBySet = new Map();
+      for (const c of collection.owned) {
+        ownedIds.add(c.cardId);
+        ownedCountBySet.set(c.setId, (ownedCountBySet.get(c.setId) || 0) + 1);
+      }
+      for (const c of collection.wishlist) {
+        wishlistIds.add(c.cardId);
+      }
+    }
+
+    async function checkGistRemoteUpdates() {
+      const gistId = getGistId();
+      if (!githubToken || !gistId) return;
+      try {
+        const res = await githubFetch(`/gists/${gistId}`);
+        if (!res.ok) return;
+        const gist = await res.json();
+        const file = gist.files[GIST_FILENAME];
+        if (!file?.content || file.truncated) return;
+        const data = JSON.parse(file.content);
+        if (!Array.isArray(data.owned) || !Array.isArray(data.wishlist)) return;
+        if (data.lastUpdated && data.lastUpdated !== collectionLastUpdated) {
+          collection = sanitizeCollection(data);
+          collectionLastUpdated = data.lastUpdated;
+          rebuildCollectionIndexes();
+          updateSidebarCounts();
+          refreshCurrentView();
+          showSyncBanner('Collection updated from another tab');
+        }
+      } catch {
+        /* ignore background sync errors */
+      }
+    }
+
+    function collectionEntryToCard(entry) {
+      return {
+        id: entry.cardId,
+        name: entry.cardName,
+        set: { id: entry.setId, name: entry.setName },
+        images: { small: entry.imageUrl },
+      };
+    }
+
+    function groupBySet(entries) {
+      const map = new Map();
+      for (const entry of entries) {
+        const list = map.get(entry.setId) ?? [];
+        list.push(entry);
+        map.set(entry.setId, list);
+      }
+      return [...map.values()].sort((a, b) =>
+        (a[0]?.setName ?? '').localeCompare(b[0]?.setName ?? ''),
+      );
+    }
+
+    function collectionEntryHtml(entry, status) {
+      const ownedPressed = status === 'owned' ? 'true' : 'false';
+      const wishPressed = status === 'wishlisted' ? 'true' : 'false';
+      return `
+        <div class="card-item ${status}" data-card-id="${escapeHtml(entry.cardId)}">
+          ${cardImgHtml(entry.imageUrl, entry.cardName)}
+          <div class="card-name">${escapeHtml(entry.cardName)}</div>
+          <div class="card-actions">
+            <button class="btn btn-small btn-own ${status === 'owned' ? 'active' : ''}" data-action="owned" data-card-id="${escapeHtml(entry.cardId)}" aria-pressed="${ownedPressed}">OWN</button>
+            <button class="btn btn-small btn-wish ${status === 'wishlisted' ? 'active' : ''}" data-action="wishlist" data-card-id="${escapeHtml(entry.cardId)}" aria-pressed="${wishPressed}">WISH</button>
+          </div>
+        </div>`;
+    }
+
+    function isOwned(cardId) {
+      return ownedIds.has(cardId);
+    }
+
+    function isWishlisted(cardId) {
+      return wishlistIds.has(cardId);
+    }
+
+    function getCardStatus(cardId) {
+      if (isOwned(cardId)) return 'owned';
+      if (isWishlisted(cardId)) return 'wishlisted';
+      return 'none';
+    }
+
+    function toggleCard(card, type) {
+      const cardId = card.id;
+      const wasActive = type === 'owned' ? isOwned(cardId) : isWishlisted(cardId);
+
+      collection.owned = collection.owned.filter(c => c.cardId !== cardId);
+      collection.wishlist = collection.wishlist.filter(c => c.cardId !== cardId);
+
+      if (!wasActive) {
+        const entry = {
+          cardId: card.id,
+          cardName: card.name,
+          setId: card.set.id,
+          setName: card.set.name,
+          imageUrl: card.images?.small || '',
+          addedAt: new Date().toISOString(),
+        };
+        collection[type].push(entry);
+      }
+
+      rebuildCollectionIndexes();
+      updateSidebarCounts();
+      debouncedSave();
+      if (currentScreen === SCREEN.SETS) renderSetsGrid();
+      else if (currentScreen === SCREEN.COLLECTION) renderCollectionScreen(collectionView);
+      else {
+        renderCardsGrid();
+        const headerMeta = document.querySelector('.cards-header-info p');
+        if (headerMeta && currentSet) {
+          headerMeta.textContent = `${ownedCountBySet.get(currentSet.id) || 0}/${currentSet.total || '?'} owned`;
+        }
+      }
+    }
+
+    function updateSidebarCounts() {
+      const ownedEl = $('#owned-count');
+      const wishEl = $('#wishlist-count');
+      if (ownedEl) ownedEl.textContent = `OWNED: ${collection.owned.length}`;
+      if (wishEl) wishEl.textContent = `WISHLIST: ${collection.wishlist.length}`;
+    }
+
+    function updateSaveStatusUI() {
+      const el = document.querySelector('#save-status-el');
+      if (!el) return;
+      const labels = {
+        saving: 'SAVING…',
+        saved: 'SAVED ✓',
+        error: saveErrorDetail || 'ERROR ✗ — click to retry',
+      };
+      if (saveStatus === 'idle') {
+        el.textContent = '';
+        el.className = 'save-status';
+        el.setAttribute('aria-hidden', 'true');
+        return;
+      }
+      el.removeAttribute('aria-hidden');
+      el.textContent = labels[saveStatus] || '';
+      el.className = 'save-status';
+      if (saveStatus === 'saving') el.classList.add('saving');
+      else if (saveStatus === 'saved') el.classList.add('saved');
+      else if (saveStatus === 'error') el.classList.add('error');
+    }
+
+    async function handleLogin(ghToken, tcgKey, gistIdInput) {
+      ghToken = ghToken.trim();
+      tcgKey = tcgKey.trim();
+      gistIdInput = gistIdInput.trim();
+      loginError = '';
+      isLoggingIn = true;
+      loginFormDraft = { gh: ghToken, tcg: tcgKey, gist: gistIdInput };
+      renderLoginScreen();
+
+      githubToken = ghToken;
+      tcgApiKey = tcgKey;
+      pendingGistId = gistIdInput || null;
+
+      try {
+        const userRes = await githubFetch('/user');
+        if (!userRes.ok) {
+          loginError = 'GitHub token validation failed.';
+          githubToken = null;
+          tcgApiKey = null;
+          isLoggingIn = false;
+          renderLoginScreen();
+          return;
+        }
+        const user = await userRes.json();
+        lsSet('forina_username', user.login);
+        lsSet('forina_avatar_url', user.avatar_url);
+
+        await tcgFetch('/sets?pageSize=1');
+
+        if (pendingGistId) {
+          const result = await loadGist(pendingGistId);
+          if (result.notFound) {
+            isLoggingIn = false;
+            showGistNotFoundDialog();
+            return;
+          }
+          if (result.invalid) {
+            loginError = 'Collection file is invalid. Check your Gist ID.';
+            githubToken = null;
+            tcgApiKey = null;
+            isLoggingIn = false;
+            renderLoginScreen();
+            return;
+          }
+        } else if (lsGet('forina_gist_id')) {
+          pendingGistId = lsGet('forina_gist_id');
+          const result = await loadGist(pendingGistId);
+          if (result.notFound) {
+            isLoggingIn = false;
+            showGistNotFoundDialog();
+            return;
+          }
+          if (result.invalid) {
+            loginError = 'Saved collection file is invalid.';
+            githubToken = null;
+            tcgApiKey = null;
+            isLoggingIn = false;
+            renderLoginScreen();
+            return;
+          }
+        }
+
+        isLoggingIn = false;
+        loginFormDraft = { gh: '', tcg: '', gist: gistIdInput };
+        currentScreen = SCREEN.SETS;
+        sidebar.classList.remove('hidden');
+        updateSidebarCounts();
+        await loadSetsScreen();
+      } catch (err) {
+        isLoggingIn = false;
+        if (err.message === 'rate_limit') {
+          loginError = 'TCG API rate limit — wait 60s and try again.';
+        } else if (err.message === 'offline') {
+          loginError = 'NO SIGNAL — check your connection.';
+        } else if (err.message !== 'Invalid GitHub token') {
+          loginError = err.message || 'Login failed.';
+        }
+        githubToken = null;
+        tcgApiKey = null;
+        renderLoginScreen();
+      }
+    }
+
+    function showGistNotFoundDialog() {
+      const overlay = document.createElement('div');
+      overlay.className = 'dialog-overlay';
+      overlay.innerHTML = `
+        <div class="dialog">
+          <p>Gist not found. Create a new one?</p>
+          <div class="dialog-actions">
+            <button class="btn" id="dialog-confirm">YES</button>
+            <button class="btn btn-danger" id="dialog-cancel">CANCEL</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#dialog-confirm').addEventListener('click', () => {
+        pendingGistId = null;
+        localStorage.removeItem('forina_gist_id');
+        collection = { owned: [], wishlist: [] };
+        collectionLastUpdated = null;
+        rebuildCollectionIndexes();
+        overlay.remove();
+        currentScreen = SCREEN.SETS;
+        sidebar.classList.remove('hidden');
+        updateSidebarCounts();
+        loadSetsScreen();
+      });
+      overlay.querySelector('#dialog-cancel').addEventListener('click', () => {
+        overlay.remove();
+        githubToken = null;
+        tcgApiKey = null;
+        loginError = 'Gist not found. Enter a valid Gist ID or leave blank.';
+        render();
+      });
+    }
+
+    function handleLogout() {
+      githubToken = null;
+      tcgApiKey = null;
+      collection = { owned: [], wishlist: [] };
+      collectionLastUpdated = null;
+      rebuildCollectionIndexes();
+      pendingGistId = null;
+      if (saveDebounceTimer) {
+        clearTimeout(saveDebounceTimer);
+        saveDebounceTimer = null;
+      }
+      lsClear();
+      currentScreen = SCREEN.LOGIN;
+      loginError = '';
+      saveStatus = 'idle';
+      saveErrorDetail = '';
+      collectionView = 'all';
+      setSearchQuery = '';
+      cardSearchQuery = '';
+      sidebar.classList.add('hidden');
+      render();
+    }
+
+    async function loadSetsScreen() {
+      screenRoot.innerHTML = '<div class="loading">LOADING SETS…</div>';
+      try {
+        sets = await fetchSets();
+        renderSetsScreen();
+      } catch (err) {
+        renderErrorBanner(err);
+      }
+    }
+
+    async function loadCardsScreen(setId, page = 1) {
+      const setChanged = !currentSet || currentSet.id !== setId;
+      if (setChanged) {
+        cardSearchQuery = '';
+        currentSet = null;
+        screenRoot.innerHTML = '<div class="loading">LOADING CARDS…</div>';
+        try {
+          const data = await tcgFetch(`/sets/${setId}`);
+          currentSet = data.data;
+          currentScreen = SCREEN.CARDS;
+          renderCardsScreen();
+          await fetchCardsPage(page);
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          renderErrorBanner(err);
+        }
+        return;
+      }
+      currentScreen = SCREEN.CARDS;
+      if (!$('#cards-grid')) renderCardsScreen();
+      await fetchCardsPage(page);
+    }
+
+    async function fetchCardsPage(page) {
+      if (tcgFetchController) tcgFetchController.abort();
+      tcgFetchController = new AbortController();
+      const { signal } = tcgFetchController;
+
+      currentPage = page;
+      const grid = $('#cards-grid');
+      if (grid) grid.innerHTML = '<div class="loading" style="grid-column:1/-1">LOADING CARDS…</div>';
+      try {
+        let query = `set.id:${currentSet.id}`;
+        const nameQ = cardSearchQuery.trim();
+        if (nameQ) query += ` name:${nameQ}*`;
+        const cardData = await tcgFetch(
+          `/cards?q=${encodeURIComponent(query)}&page=${page}&pageSize=${CARD_PAGE_SIZE}`,
+          { signal },
+        );
+        currentCards = cardData.data;
+        totalPages = Math.ceil(cardData.totalCount / cardData.pageSize) || 1;
+        renderCardsGrid();
+        updatePaginationUI();
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        renderErrorBanner(err);
+      }
+    }
+
+    function updatePaginationUI() {
+      const prev = $('#prev-page');
+      const next = $('#next-page');
+      const indicator = document.querySelector('.page-indicator');
+      if (prev) prev.disabled = currentPage <= 1;
+      if (next) next.disabled = currentPage >= totalPages;
+      if (indicator) indicator.textContent = `${currentPage} / ${totalPages}`;
+    }
+
+    function renderErrorBanner(err) {
+      let msg = 'Something went wrong.';
+      let showRetry = true;
+      if (err.message === 'rate_limit') {
+        const remaining = Math.ceil((rateLimitUntil - Date.now()) / 1000);
+        msg = `API LIMIT — WAIT ${remaining}s`;
+        showRetry = false;
+        setTimeout(() => {
+          if (currentScreen === SCREEN.SETS) loadSetsScreen();
+          else if (currentScreen === SCREEN.CARDS && currentSet) fetchCardsPage(currentPage);
+          else if (currentScreen === SCREEN.COLLECTION) renderCollectionScreen(collectionView);
+        }, remaining * 1000);
+      } else if (err.message === 'offline') {
+        msg = 'NO SIGNAL';
+      }
+
+      const existing = screenRoot.innerHTML;
+      screenRoot.innerHTML = `
+        <div class="banner-error">
+          ${msg}
+          ${showRetry ? '<br><button class="btn btn-small" id="retry-btn">RETRY</button>' : ''}
+        </div>
+      ` + (existing.includes('loading') ? '' : existing);
+
+      const retryBtn = $('#retry-btn');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+          if (currentScreen === SCREEN.SETS) loadSetsScreen();
+          else if (currentScreen === SCREEN.CARDS && currentSet) fetchCardsPage(currentPage);
+          else if (currentScreen === SCREEN.COLLECTION) renderCollectionScreen(collectionView);
+        });
+      }
+    }
+
+    function render() {
+      if (currentScreen === SCREEN.LOGIN) renderLoginScreen();
+      else if (currentScreen === SCREEN.SETS) renderSetsScreen();
+      else if (currentScreen === SCREEN.CARDS) {
+        renderCardsScreen();
+        if (currentSet) fetchCardsPage(currentPage);
+      }
+      else if (currentScreen === SCREEN.COLLECTION) renderCollectionScreen(collectionView);
+    }
+
+    function renderLoginScreen() {
+      sidebar.classList.add('hidden');
+      const { gh, tcg, gist } = loginFormDraft;
+      screenRoot.innerHTML = `
+        <div class="login-panel">
+          <h1>ForinaDex</h1>
+          <form id="login-form">
+          <div class="form-group">
+            <label class="form-label" for="gh-token">GITHUB PERSONAL ACCESS TOKEN</label>
+            <input type="password" id="gh-token" placeholder="ghp_..." autocomplete="off" value="${escapeHtml(gh)}" ${isLoggingIn ? 'disabled' : ''}>
+            <a class="form-link" href="https://github.com/settings/tokens/new?scopes=gist" target="_blank" rel="noopener">Create a GitHub PAT →</a>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tcg-key">POKÉMON TCG API KEY</label>
+            <input type="password" id="tcg-key" placeholder="your-api-key" autocomplete="off" value="${escapeHtml(tcg)}" ${isLoggingIn ? 'disabled' : ''}>
+            <a class="form-link" href="https://dev.pokemontcg.io" target="_blank" rel="noopener">Get a free TCG API key →</a>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="gist-id">GIST ID (OPTIONAL)</label>
+            <input type="text" id="gist-id" placeholder="leave blank for new" autocomplete="off" value="${escapeHtml(gist)}" ${isLoggingIn ? 'disabled' : ''}>
+            <p class="helper-text">Leave blank if this is your first time</p>
+          </div>
+          <button class="btn" type="submit" id="open-btn" style="width:100%" ${isLoggingIn ? 'disabled' : ''}>${isLoggingIn ? 'OPENING…' : 'OPEN'}</button>
+          </form>
+          ${loginError ? `<p class="error-msg">${escapeHtml(loginError)}</p>` : ''}
+          <p class="security-note">Your tokens are kept in memory only and are never saved to disk</p>
+        </div>
+      `;
+
+      const loginFieldKeys = { 'gh-token': 'gh', 'tcg-key': 'tcg', 'gist-id': 'gist' };
+
+      Object.entries(loginFieldKeys).forEach(([id, key]) => {
+        const el = $('#' + id);
+        if (!el) return;
+
+        const trimField = () => {
+          const trimmed = el.value.trim();
+          if (el.value !== trimmed) {
+            el.value = trimmed;
+            loginFormDraft[key] = trimmed;
+          }
+        };
+
+        el.addEventListener('input', (e) => {
+          loginFormDraft[key] = e.target.value;
+        });
+        el.addEventListener('paste', () => requestAnimationFrame(trimField));
+        el.addEventListener('blur', trimField);
+      });
+
+      $('#login-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (isLoggingIn) return;
+        const gh = $('#gh-token').value.trim();
+        const tcg = $('#tcg-key').value.trim();
+        const gistVal = $('#gist-id').value.trim();
+        if (!gh || !tcg) {
+          loginError = 'Both tokens are required.';
+          loginFormDraft = { gh, tcg, gist: gistVal };
+          renderLoginScreen();
+          return;
+        }
+        handleLogin(gh, tcg, gistVal);
+      });
+    }
+
+    function bindHeaderEvents() {
+      $('#logout-btn')?.addEventListener('click', handleLogout);
+      bindSettingsEvents();
+    }
+
+    function renderSetsGrid() {
+      const grid = $('#sets-grid');
+      if (!grid) return;
+
+      const filtered = setSearchQuery
+        ? sets.filter(s => s.name.toLowerCase().includes(setSearchQuery.toLowerCase()))
+        : sets;
+
+      grid.innerHTML = filtered.map(set => {
+        const ownedInSet = ownedCountBySet.get(set.id) || 0;
+        return `
+        <div class="set-card" data-set-id="${escapeHtml(set.id)}">
+          ${set.images?.logo
+            ? cardImgHtml(set.images.logo, set.name)
+            : '<div class="card-placeholder"></div>'}
+          <div class="set-name">${escapeHtml(set.name)}</div>
+          <div class="set-meta">${escapeHtml(set.series || '')}</div>
+          <div class="set-meta">${ownedInSet}/${set.total || '?'} owned · ${set.releaseDate ? new Date(set.releaseDate).getFullYear() : '?'}</div>
+        </div>`;
+      }).join('');
+
+      bindImgFallbacks(grid);
+
+      grid.querySelectorAll('.set-card').forEach(el => {
+        el.addEventListener('click', () => {
+          currentScreen = SCREEN.CARDS;
+          collectionView = 'all';
+          document.querySelectorAll('[data-filter]').forEach(b => {
+            b.classList.toggle('active', b.dataset.filter === 'all');
+          });
+          loadCardsScreen(el.dataset.setId, 1);
+        });
+      });
+    }
+
+    function renderSetsScreen() {
+      if (!sets.length) {
+        screenRoot.innerHTML = renderAppHeader({ variant: 'sets' }) + '<div class="loading">LOADING SETS…</div>';
+        bindHeaderEvents();
+        return;
+      }
+
+      screenRoot.innerHTML = renderAppHeader({ variant: 'sets' }) + `
+        <div class="search-bar">
+          <input type="text" id="set-search" placeholder="Search sets…" value="${escapeHtml(setSearchQuery)}">
+        </div>
+        <div class="grid-sets" id="sets-grid"></div>
+      `;
+
+      bindHeaderEvents();
+      renderSetsGrid();
+
+      $('#set-search')?.addEventListener('input', (e) => {
+        setSearchQuery = e.target.value;
+        renderSetsGrid();
+      });
+    }
+
+    function renderCardsScreen() {
+      if (!currentSet) return;
+
+      screenRoot.innerHTML = `
+        ${renderAppHeader({ variant: 'detail' })}
+        <div class="cards-header">
+          ${currentSet.images?.logo ? cardImgHtml(currentSet.images.logo, currentSet.name) : ''}
+          <div class="cards-header-info">
+            <h2>${escapeHtml(currentSet.name)}</h2>
+            <p>${ownedCountBySet.get(currentSet.id) || 0}/${currentSet.total || '?'} owned</p>
+          </div>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="card-search" placeholder="Search cards in this set…" value="${escapeHtml(cardSearchQuery)}">
+        </div>
+        <div class="grid-cards" id="cards-grid"></div>
+        <div class="pagination">
+          <button class="btn btn-small" id="prev-page" ${currentPage <= 1 ? 'disabled' : ''}>← PREV</button>
+          <span class="page-indicator">${currentPage} / ${totalPages}</span>
+          <button class="btn btn-small" id="next-page" ${currentPage >= totalPages ? 'disabled' : ''}>NEXT →</button>
+        </div>
+      `;
+
+      bindImgFallbacks(screenRoot);
+      bindCardsEvents();
+    }
+
+    function renderCollectionScreen(type) {
+      const entries = collection[type];
+      const label = type === 'owned' ? 'Owned' : 'Wishlist';
+      const status = type === 'owned' ? 'owned' : 'wishlisted';
+
+      let bodyHtml;
+      if (!entries.length) {
+        bodyHtml = `<p class="collection-empty">No ${type === 'owned' ? 'owned' : 'wishlisted'} cards yet. Browse sets to add some!</p>`;
+      } else {
+        const groups = groupBySet(entries);
+        bodyHtml = `<div class="collection-view">${groups.map(group => `
+          <div class="collection-group">
+            <h3 class="collection-set-name">${escapeHtml(group[0].setName)}</h3>
+            <div class="grid-cards">
+              ${group.map(entry => collectionEntryHtml(entry, status)).join('')}
+            </div>
+          </div>
+        `).join('')}</div>`;
+      }
+
+      screenRoot.innerHTML = `
+        ${renderAppHeader({ variant: 'detail' })}
+        <div class="collection-header">
+          <h2>${label} collection</h2>
+          <p>${entries.length} card${entries.length === 1 ? '' : 's'}</p>
+        </div>
+        ${bodyHtml}
+      `;
+
+      bindImgFallbacks(screenRoot);
+      bindCollectionEvents();
+    }
+
+    function bindCollectionEvents() {
+      $('#back-btn')?.addEventListener('click', () => {
+        currentScreen = SCREEN.SETS;
+        collectionView = 'all';
+        document.querySelectorAll('[data-filter]').forEach(b => {
+          b.classList.toggle('active', b.dataset.filter === 'all');
+        });
+        renderSetsScreen();
+      });
+      $('#logout-btn')?.addEventListener('click', handleLogout);
+      bindSaveStatusEvents();
+      bindSettingsEvents();
+      bindCardToggleEvents(true);
+    }
+
+    function renderCardsGrid() {
+      const grid = $('#cards-grid');
+      if (!grid) return;
+
+      grid.innerHTML = currentCards.map(card => {
+        const status = getCardStatus(card.id);
+        const ownedPressed = status === 'owned' ? 'true' : 'false';
+        const wishPressed = status === 'wishlisted' ? 'true' : 'false';
+
+        return `
+          <div class="card-item ${status !== 'none' ? status : ''}" data-card-id="${escapeHtml(card.id)}">
+            ${cardImgHtml(card.images?.small, card.name)}
+            <div class="card-name">${escapeHtml(card.name)}</div>
+            <div class="card-number">#${escapeHtml(card.number)}${card.set?.printedTotal ? '/' + escapeHtml(card.set.printedTotal) : ''}</div>
+            <div class="card-actions">
+              <button class="btn btn-small btn-own ${status === 'owned' ? 'active' : ''}" data-action="owned" data-card-id="${escapeHtml(card.id)}" aria-pressed="${ownedPressed}">OWN</button>
+              <button class="btn btn-small btn-wish ${status === 'wishlisted' ? 'active' : ''}" data-action="wishlist" data-card-id="${escapeHtml(card.id)}" aria-pressed="${wishPressed}">WISH</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      bindImgFallbacks(grid);
+      bindCardToggleEvents(false);
+    }
+
+    function bindCardsEvents() {
+      $('#back-btn')?.addEventListener('click', () => {
+        currentScreen = SCREEN.SETS;
+        currentSet = null;
+        renderSetsScreen();
+      });
+      $('#logout-btn')?.addEventListener('click', handleLogout);
+      $('#prev-page')?.addEventListener('click', () => {
+        if (currentPage > 1) fetchCardsPage(currentPage - 1);
+      });
+      $('#next-page')?.addEventListener('click', () => {
+        if (currentPage < totalPages) fetchCardsPage(currentPage + 1);
+      });
+      $('#card-search')?.addEventListener('input', (e) => {
+        cardSearchQuery = e.target.value;
+        if (cardSearchDebounce) clearTimeout(cardSearchDebounce);
+        cardSearchDebounce = setTimeout(() => fetchCardsPage(1), 400);
+      });
+      bindSaveStatusEvents();
+      bindSettingsEvents();
+    }
+
+    function bindCardToggleEvents(fromCollection) {
+      document.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cardId = btn.dataset.cardId;
+          const action = btn.dataset.action;
+          let card;
+          if (fromCollection) {
+            const entry = collection.owned.find(c => c.cardId === cardId)
+              || collection.wishlist.find(c => c.cardId === cardId);
+            if (entry) card = collectionEntryToCard(entry);
+          } else {
+            card = currentCards.find(c => c.id === cardId);
+          }
+          if (card) toggleCard(card, action);
+        });
+      });
+    }
+
+    document.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        collectionView = btn.dataset.filter;
+        document.querySelectorAll('[data-filter]').forEach(b => {
+          b.classList.toggle('active', b.dataset.filter === collectionView);
+        });
+        if (collectionView === 'owned' || collectionView === 'wishlist') {
+          currentScreen = SCREEN.COLLECTION;
+          renderCollectionScreen(collectionView);
+        } else {
+          currentScreen = SCREEN.SETS;
+          currentSet = null;
+          renderSetsScreen();
+        }
+      });
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+      if (saveDebounceTimer) {
+        clearTimeout(saveDebounceTimer);
+        saveDebounceTimer = null;
+        saveToGist();
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && saveDebounceTimer) {
+        clearTimeout(saveDebounceTimer);
+        saveDebounceTimer = null;
+        saveToGist();
+      } else if (document.visibilityState === 'visible' && githubToken) {
+        checkGistRemoteUpdates();
+      }
+    });
+
+    function showGistCopyMessage(msg, isError = false) {
+      const btn = $('#copy-gist-btn');
+      if (!btn) return;
+      const orig = btn.textContent;
+      btn.textContent = msg;
+      btn.classList.toggle('gist-msg', isError);
+      btn.disabled = isError;
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('gist-msg');
+        btn.disabled = false;
+      }, isError ? 2500 : 1500);
+    }
+
+    $('#copy-gist-btn')?.addEventListener('click', async () => {
+      const id = getGistId();
+      if (!id) {
+        showGistCopyMessage('SAVE A CARD FIRST', true);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(id);
+        showGistCopyMessage('COPIED!');
+      } catch {
+        prompt('Copy your Gist ID:', id);
+      }
+    });
+
+    rebuildCollectionIndexes();
+
+    initContrast();
+    initGridSize();
+    renderLoginScreen();
+  </script>
+</body>
+</html>

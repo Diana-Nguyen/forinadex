@@ -1,0 +1,173 @@
+/* Fits inside a portfolio content column — no fixed max-width, inherits page fonts.
+   Theme via CSS variables on .pokemon-collection, or pass className for scoped overrides. */
+
+.pokemon-collection {
+  width: 100%;
+
+  /* Grid */
+  --pc-grid-min: 64px;
+  --pc-grid-min-md: 80px;
+  --pc-grid-min-lg: 96px;
+  --pc-grid-gap: 8px;
+  --pc-grid-gap-md: 10px;
+  --pc-grid-gap-lg: 12px;
+
+  /* Set groups */
+  --pc-sets-gap: 1.25rem;
+  --pc-set-divider-width: 1px;
+  --pc-set-divider-color: rgb(0 0 0 / 0.1);
+  --pc-set-group-padding-top: 1.25rem;
+
+  /* Card thumbnails */
+  --pc-thumb-radius: 4px;
+  --pc-thumb-bg: rgb(0 0 0 / 0.05);
+  --pc-thumb-empty-bg: rgb(0 0 0 / 0.08);
+  --pc-thumb-aspect-ratio: 2.5 / 3.5;
+
+  /* Toolbar */
+  --pc-toolbar-gap: 12px 16px;
+  --pc-toolbar-margin-bottom: 1.25rem;
+  --pc-tabs-gap: 8px;
+
+  /* Tabs */
+  --pc-tab-font-size: 0.8125rem;
+  --pc-tab-padding: 0.35rem 0.7rem;
+  --pc-tab-border: 1px solid currentColor;
+  --pc-tab-radius: 2px;
+  --pc-tab-opacity: 0.55;
+  --pc-tab-active-opacity: 1;
+  --pc-tab-active-weight: 600;
+
+  /* Link */
+  --pc-link-font-size: 0.8125rem;
+  --pc-link-opacity: 0.75;
+  --pc-link-hover-opacity: 1;
+
+  /* Messages & skeleton */
+  --pc-message-margin: 2rem 0;
+  --pc-message-font-size: 0.9375rem;
+  --pc-message-opacity: 0.7;
+  --pc-skeleton-bg: rgb(0 0 0 / 0.08);
+}
+
+.pokemon-collection__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-toolbar-gap);
+  margin-bottom: var(--pc-toolbar-margin-bottom);
+}
+
+.pokemon-collection__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pc-tabs-gap);
+}
+
+.pokemon-collection__tab {
+  font: inherit;
+  font-size: var(--pc-tab-font-size);
+  letter-spacing: 0.02em;
+  padding: var(--pc-tab-padding);
+  border: var(--pc-tab-border);
+  border-radius: var(--pc-tab-radius);
+  background: transparent;
+  color: inherit;
+  opacity: var(--pc-tab-opacity);
+  cursor: pointer;
+}
+
+.pokemon-collection__tab--active {
+  opacity: var(--pc-tab-active-opacity);
+  font-weight: var(--pc-tab-active-weight);
+}
+
+.pokemon-collection__tab:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.pokemon-collection__link {
+  font: inherit;
+  font-size: var(--pc-link-font-size);
+  opacity: var(--pc-link-opacity);
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pokemon-collection__link:hover {
+  opacity: var(--pc-link-hover-opacity);
+  text-decoration: underline;
+}
+
+.pokemon-collection__sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pc-sets-gap);
+}
+
+.pokemon-collection__set-group + .pokemon-collection__set-group {
+  padding-top: var(--pc-set-group-padding-top);
+  border-top: var(--pc-set-divider-width) solid var(--pc-set-divider-color);
+}
+
+.pokemon-collection__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--pc-grid-min), 1fr));
+  gap: var(--pc-grid-gap);
+}
+
+@media (min-width: 480px) {
+  .pokemon-collection__grid {
+    grid-template-columns: repeat(auto-fill, minmax(var(--pc-grid-min-md), 1fr));
+    gap: var(--pc-grid-gap-md);
+  }
+}
+
+@media (min-width: 700px) {
+  .pokemon-collection__grid {
+    grid-template-columns: repeat(auto-fill, minmax(var(--pc-grid-min-lg), 1fr));
+    gap: var(--pc-grid-gap-lg);
+  }
+}
+
+.pokemon-collection__thumb {
+  width: 100%;
+  aspect-ratio: var(--pc-thumb-aspect-ratio);
+  object-fit: contain;
+  display: block;
+  border-radius: var(--pc-thumb-radius);
+  background: var(--pc-thumb-bg);
+}
+
+.pokemon-collection__thumb--empty {
+  background: var(--pc-thumb-empty-bg);
+}
+
+.pokemon-collection__skeleton {
+  aspect-ratio: var(--pc-thumb-aspect-ratio);
+  border-radius: var(--pc-thumb-radius);
+  background: var(--pc-skeleton-bg);
+}
+
+.pokemon-collection__message {
+  margin: var(--pc-message-margin);
+  text-align: center;
+  font: inherit;
+  font-size: var(--pc-message-font-size);
+  opacity: var(--pc-message-opacity);
+}
+
+.pokemon-collection__retry {
+  display: block;
+  margin: 0 auto 2rem;
+  font: inherit;
+  font-size: var(--pc-message-font-size);
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: transparent;
+}
